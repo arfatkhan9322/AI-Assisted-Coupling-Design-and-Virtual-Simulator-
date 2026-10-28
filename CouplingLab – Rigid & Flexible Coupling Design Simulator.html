@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CouplingLab – Rigid & Flexible Coupling Design Simulator</title>
+<style>
+:root{--bg:#f4f6f9;--card:#ffffff;--tx:#18202b;--mu:#5a6a7e;--ln:#dde3ec;--ac:#2563eb;--ok:#16a068;--wn:#d99a00;--bd:#e5484d;--sv:#f1f4f8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{color-scheme:light}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--ln);background:var(--card)}
+h1{margin:0;font-size:20px}header p{margin:2px 0 0;color:var(--mu);font-size:13px}
+main{display:grid;grid-template-columns:310px 1fr;gap:14px;padding:14px;max-width:1300px;margin:auto}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;min-width:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin:0 0 10px}
+.seg{display:flex;gap:6px;margin-bottom:10px}.seg button,.pre button{flex:1;padding:8px;border:1px solid var(--ln);background:var(--sv);color:var(--tx);border-radius:8px;cursor:pointer;font:inherit}
+.seg button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pre{display:flex;gap:6px;margin-bottom:12px}.pre button{font-size:12px}
+.f{margin-bottom:9px}.f label{display:block;font-size:12px;color:var(--mu)}
+.f .r{display:flex;gap:8px;align-items:center}.f input[type=range]{flex:1;accent-color:var(--ac)}
+.f input[type=number]{width:100%;padding:4px;border:1px solid var(--ln);border-radius:6px;background:var(--sv);color:var(--tx)}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.k{background:var(--sv);border-radius:10px;padding:10px}.k b{display:block;font-size:20px}.k span{font-size:11px;color:var(--mu)}
+.st{color:#fff;border-radius:10px;padding:10px;text-align:center;font-weight:700}
+.vis{display:grid;grid-template-columns:2fr 1fr;gap:10px}@media(max-width:700px){.vis{grid-template-columns:1fr}}
+svg{width:100%;height:auto;background:var(--sv);border-radius:10px}
+svg text{fill:var(--tx);font:11px system-ui}
+@keyframes spin{to{transform:rotate(360deg)}}.spin{transform-origin:150px 150px;animation:spin var(--dur,2s) linear infinite}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}@media(max-width:860px){.two{grid-template-columns:1fr}}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid var(--ln);text-align:left;white-space:nowrap}
+.bar{height:8px;border-radius:4px;background:var(--ln);min-width:60px}.bar i{display:block;height:100%;border-radius:4px}
+ul{margin:0;padding-left:18px}li{margin-bottom:6px}.sm{font-size:12px;color:var(--mu)}
+</style></head><body>
+<header><h1>⚙️ CouplingLab – Coupling Design Simulator</h1><p>Rigid flange &amp; flexible bush-pin couplings · live design calculations, stress checks, 2D drawings and design advisor</p></header>
+<main>
+<aside class="card"><h2>Inputs</h2>
+<div class="seg"><button id="bR" class="on">Rigid flange</button><button id="bF">Flexible bush-pin</button></div>
+<div class="pre"><button id="p1">Textbook case</button><button id="p2">Heavy duty</button><button id="p3">Misaligned</button></div>
+<div id="inp"></div></aside>
+<section>
+<div class="kp" id="kpi"></div>
+<div class="card"><h2>Coupling drawing (section &amp; end view)</h2><div class="vis"><svg id="fr" viewBox="0 0 640 300"></svg><svg id="en" viewBox="0 0 300 300"></svg></div>
+<p class="sm" id="cap"></p></div>
+<div class="two"><div class="card tw"><h2>Stress &amp; safety check</h2><table id="res"></table></div>
+<div class="card"><h2>Design dimensions</h2><table id="dim"></table></div></div>
+<div class="two"><div class="card"><h2>🤖 AI design advisor</h2><ul id="adv"></ul></div>
+<div class="card"><h2>Validation &amp; references</h2><div id="val"></div></div></div>
+</section></main>
+<script>
+const $=i=>document.getElementById(i),f=(x,n=1)=>(+x).toFixed(n);
+const STD=[10,12,14,16,18,20,22,25,28,30,32,35,38,40,42,45,48,50,55,60,65,70,75,80,85,90,95,100,110,120,130,140,150,160,180,200],BOLT=[6,8,10,12,16,20,24,30,36,42,48];
+const CFG=[['P','Transmitted power',.5,500,.5,15,'kW'],['N','Shaft speed',50,5000,10,900,'rpm'],['Ks','Service factor',1,2.5,.05,1.35,''],['tS','Shaft allowable shear',20,120,1,40,'MPa'],['tB','Bolt / pin allowable shear',20,120,1,40,'MPa'],['tK','Key allowable shear',20,120,1,40,'MPa'],['sC','Key allowable crushing',40,250,1,80,'MPa'],['tC','Hub / flange allowable shear (CI)',2,40,.5,8,'MPa'],['pB','Bush allowable pressure',.2,1.5,.05,.5,'MPa'],['e','Parallel misalignment',0,2,.01,.05,'mm'],['a','Angular misalignment',0,3,.01,.1,'°'],['dO','Shaft dia. override (0 = auto)',0,200,1,0,'mm']];
+let type='rigid';
+$('inp').innerHTML=CFG.map(c=>`<div class="f"><label>${c[1]} (${c[6]||'–'})</label><div class="r"><input type="number" id="${c[0]}" step="any" value="${c[5]}"></div></div>`).join('');
+CFG.forEach(c=>{$(c[0]).oninput=go});
+const setV=o=>{for(const k in o)$(k).value=o[k];go()};
+$('p1').onclick=()=>setV({P:15,N:900,Ks:1.35,tS:40,tB:40,tK:40,sC:80,tC:8,e:0,a:0,dO:0});
+$('p2').onclick=()=>setV({P:150,N:1500,Ks:1.75,tS:60,tB:60,tK:60,sC:120,tC:12,e:.05,a:.1,dO:0});
+$('p3').onclick=()=>setV({P:30,N:1450,Ks:1.5,e:.4,a:.8,dO:0});
+$('bR').onclick=()=>{type='rigid';$('bR').className='on';$('bF').className='';go()};
+$('bF').onclick=()=>{type='flex';$('bF').className='on';$('bR').className='';go()};
+const V=()=>{const v={};CFG.forEach(c=>v[c[0]]=Math.abs(+$(c[0]).value)||0);return v};
+function calc(){
+ const v=V();['P','N','tS','tB','tK','sC','tC','pB'].forEach(k=>v[k]=v[k]||1e-6);v.Ks=v.Ks||1;const rg=type==='rigid',T=9550*v.P/v.N,Td=T*v.Ks,TN=Td*1000,dmin=Math.cbrt(16*TN/(Math.PI*v.tS));
+ const d=v.dO>0?v.dO:(STD.find(x=>x>=dmin)||Math.ceil(dmin)),D=2*d,L=1.5*d,t=.5*d,D1=3*d,D2=4*d,b=d/4,h=d/6,kl=1.5*d;
+ const ea=rg?.05:.5,aa=rg?.1:1,Km=1+.5*(v.e/ea+v.a/aa),el=[];
+ const add=(n,a,al,k=Km)=>el.push({n,act:a*k,all:al,fs:al/((a*k)||1e-9)});
+ add('Shaft torsional shear',16*TN/(Math.PI*d**3),v.tS,1);add('Key shear',2*TN/(b*kl*d),v.tK);add('Key crushing',4*TN/(h*kl*d),v.sC);
+ let n,x={},eq=0;
+ if(rg){n=d<=40?3:d<=100?4:d<=180?6:8;const m=Math.sqrt(8*TN/(Math.PI*n*v.tB*D1)),db=BOLT.find(q=>q>=m)||Math.ceil(m),tau=8*TN/(Math.PI*n*db*db*D1);
+  add('Bolt shear',tau,v.tB);add('Hub torsional shear',16*TN*D/(Math.PI*(D**4-d**4)),v.tC);add('Flange shear at hub',2*TN/(Math.PI*D*D*t),v.tC);
+  x={db};eq=Math.abs(n*Math.PI/4*db*db*tau*D1/2-TN)/TN}
+ else{n=d<=60?4:6;const dp=Math.ceil(.5*d/Math.sqrt(n)),lp=2*dp,F=2*TN/(n*D1);
+  add('Bush bearing pressure',F/(dp*lp),v.pB);add('Pin shear',4*F/(Math.PI*dp*dp),v.tB);add('Pin bending',32*F*(lp/2+5)/(Math.PI*dp**3),2*v.tB);
+  x={dp,lp,F};eq=Math.abs(n*F*D1/2-TN)/TN}
+ const g=el.reduce((p,q)=>q.fs<p.fs?q:p),fs=g.fs;
+ return{v,rg,T,Td,dmin,d,D,L,t,D1,D2,b,h,kl,n,x,el,g,fs,Km,ea,aa,eq,Tc:T*fs,vr:Math.PI*D2*v.N/60000}}
+const col=fs=>fs>=1.5?'var(--ok)':fs>=1?'var(--wn)':'var(--bd)';
+function go(){
+ const c=calc(),{v,d,D,L,t,D1,D2,n,x,rg}=c,sc=col(c.fs),stx=c.fs>=1.5?'SAFE':c.fs>=1?'MARGINAL':'UNSAFE';
+ $('kpi').innerHTML=[['Torque T',f(c.T)+' N·m'],['Design torque',f(c.Td)+' N·m'],['Shaft dia.',d+' mm'],['Torque capacity',f(c.Tc)+' N·m'],['Min. safety factor',f(c.fs,2)]].map(a=>`<div class="k"><span>${a[0]}</span><b>${a[1]}</b></div>`).join('')+`<div class="st" style="background:${sc}">${stx}<br><small>${c.g.n}</small></div>`;
+ // front section
+ const s=65/d,r=d*s/2,hr=D*s/2,fr=D2*s/2,Lp=L*s,tp=t*s,pc=D1*s/2,cy=150,mis=Math.min(v.e*s*8,22),ang=Math.min(v.a*6,8),bc=col(c.el.find(q=>/Bolt|Bush/.test(q.n))?.fs||c.fs);
+ const half=`<rect x="${320-Lp}" y="${cy-hr}" width="${Lp}" height="${2*hr}" fill="url(#ir)" stroke="#555"/><rect x="${320-tp}" y="${cy-fr}" width="${tp}" height="${2*fr}" fill="url(#ir)" stroke="#555"/><rect x="60" y="${cy-r}" width="259" height="${2*r}" fill="url(#st)" stroke="#444"/><rect x="${324-Lp}" y="${cy-r-Math.max(4,c.h*s/2)}" width="${Lp-8}" height="${Math.max(4,c.h*s/2)}" fill="#c9a24b" stroke="#6b5415"/>`;
+ let fx='';for(const sg of[-1,1]){const y=cy+sg*pc;
+  if(rg){const bh=x.db*s;fx+=`<rect x="${320-tp-6}" y="${y-bh/2}" width="${2*tp+12}" height="${bh}" fill="${bc}" stroke="#222"/><rect x="${320-tp-16}" y="${y-bh*.85}" width="10" height="${bh*1.7}" fill="#8a94a3" stroke="#222"/><rect x="${320+tp+6}" y="${y-bh*.85}" width="10" height="${bh*1.7}" fill="#8a94a3" stroke="#222"/>`}
+  else{const ph=x.dp*s;fx+=`<rect x="320" y="${y-ph*.9}" width="${tp}" height="${ph*1.8}" fill="#d9742b" stroke="#6b3410"/><rect x="${320-tp-8}" y="${y-ph/2}" width="${2*tp+8}" height="${ph}" fill="${bc}" stroke="#222"/>`}}
+ $('fr').innerHTML=`<defs><linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9edf2"/><stop offset=".5" stop-color="#9aa5b4"/><stop offset="1" stop-color="#5d6877"/></linearGradient><linearGradient id="ir" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d939c"/><stop offset=".5" stop-color="#5c626b"/><stop offset="1" stop-color="#3a3f47"/></linearGradient></defs><line x1="10" y1="${cy}" x2="630" y2="${cy}" stroke="var(--mu)" stroke-dasharray="10 4 2 4"/><g>${half}</g><g transform="translate(0 ${mis}) rotate(${ang} 320 ${cy}) translate(640 0) scale(-1 1)">${half}</g>${fx}<line x1="320" y1="${cy-fr-6}" x2="320" y2="${cy+fr+6}" stroke="var(--mu)" stroke-dasharray="3 3"/><text x="12" y="16">Ø${D2} flange · Ø${D} hub · Ø${d} shaft (mm)</text><text x="12" y="292">Misalignment exaggerated for visibility · e=${v.e} mm, α=${v.a}°</text>`;
+ // end view
+ const es=130/(D2/2);let bl='';for(let i=0;i<n;i++){const A=2*Math.PI*i/n,bx=150+D1/2*es*Math.cos(A),by=150+D1/2*es*Math.sin(A),br=Math.max(5,(rg?x.db:x.dp)*es/2);
+  bl+=(rg?'':`<circle cx="${bx}" cy="${by}" r="${br*1.6}" fill="#d9742b" stroke="#6b3410"/>`)+`<circle cx="${bx}" cy="${by}" r="${br}" fill="${bc}" stroke="#111"/>`}
+ $('en').innerHTML=`<defs><radialGradient id="rg"><stop offset=".4" stop-color="#7b828d"/><stop offset="1" stop-color="#3e444c"/></radialGradient></defs><g class="spin" style="--dur:${Math.min(12,Math.max(.8,1200/v.N))}s"><circle cx="150" cy="150" r="130" fill="url(#rg)" stroke="#222" stroke-width="2"/><circle cx="150" cy="150" r="${D1/2*es}" fill="none" stroke="#ddd" stroke-dasharray="5 4"/><circle cx="150" cy="150" r="${D/2*es}" fill="#555b64" stroke="#222"/>${bl}<circle cx="150" cy="150" r="${d/2*es}" fill="url(#st)" stroke="#222"/><rect x="${150-c.b*es/2}" y="${150-d/2*es-c.h*es*.5}" width="${c.b*es}" height="${c.h*es*.7}" fill="#c9a24b" stroke="#6b5415"/></g><text x="8" y="14">End view · ${n} ${rg?'bolts':'bush pins'} on PCD Ø${D1}</text>`;
+ $('cap').textContent=`Rim speed ${f(c.vr)} m/s · misalignment penalty factor Kₘ = ${f(c.Km,2)} (allowable e ${c.ea} mm, α ${c.aa}°). Bolt/pin colour = safety level.`;
+ $('res').innerHTML='<tr><th>Check</th><th>Actual</th><th>Allow.</th><th>FS</th><th></th></tr>'+c.el.map(q=>`<tr><td>${q.n}</td><td>${f(q.act,2)}</td><td>${f(q.all,1)}</td><td><b style="color:${col(q.fs)}">${f(q.fs,2)}</b></td><td><div class="bar"><i style="width:${Math.min(100,q.fs/3*100)}%;background:${col(q.fs)}"></i></div></td></tr>`).join('');
+ const rows=[['Min. shaft Ø (calc)',f(c.dmin,1)+' mm'],['Hub Ø / length',`${D} / ${L} mm`],['Flange Ø / thick.',`${D2} / ${t} mm`],['PCD',D1+' mm'],['Key b×h×l',`${f(c.b,1)}×${f(c.h,1)}×${f(c.kl,0)} mm`],rg?['Bolts',`${n} × M${x.db}`]:['Pins',`${n} × Ø${x.dp}, bush ${x.lp} mm`]];
+ $('dim').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td></tr>`).join('');
+ const A=[];
+ if(c.fs<1)A.push(`❌ <b>${c.g.n}</b> governs (FS ${f(c.fs,2)}). Increase shaft diameter override, use a stronger material, or reduce misalignment.`);
+ else if(c.fs<1.5)A.push(`⚠️ Marginal margin (FS ${f(c.fs,2)}), governed by ${c.g.n}. Aim for FS ≥ 1.5 for shock-prone duty.`);
+ else if(c.fs>4)A.push('ℹ️ Over-designed (FS > 4). A smaller size would save weight and cost.');else A.push('✅ Design is adequate for the given duty and allowable stresses.');
+ if(rg&&(v.e>.05||v.a>.1))A.push('🔧 A rigid coupling cannot absorb misalignment. Realign the shafts to within 0.05 mm / 0.1° or switch to a flexible bush-pin coupling.');
+ if(!rg&&(v.e>.5||v.a>1))A.push('🔧 Misalignment exceeds typical bush-pin limits (0.5 mm / 1°). Expect rapid bush wear — use a gear or disc coupling.');
+ if(c.vr>30)A.push(`🌀 Rim speed ${f(c.vr)} m/s exceeds ~30 m/s for cast iron. Use steel flanges and dynamic balancing.`);
+ if(/Key/.test(c.g.n))A.push('🔑 Key governs: increase key length, use a stronger key steel, or use two keys at 120°.');
+ if(v.dO>0&&v.dO<c.dmin)A.push(`⚠️ Override Ø${v.dO} mm is below the minimum Ø${f(c.dmin,1)} mm for the allowable shaft stress.`);
+ if(v.Ks<1.25&&v.P>50)A.push('💡 Heavy power with a low service factor — check for shock/start-up torque (Ks 1.5–2 typical).');
+ $('adv').innerHTML=A.map(a=>`<li>${a}</li>`).join('');
+ const T2=v.P*1000/(2*Math.PI*v.N/60);
+ $('val').innerHTML=`<table><tr><td>T = 9550P/N vs P/ω</td><td>${f(c.T,2)} vs ${f(T2,2)} N·m ${Math.abs(c.T-T2)/T<1e-3?'✓':'✗'}</td></tr><tr><td>Torque equilibrium (Σ bolt/pin moments = Td)</td><td>${(c.eq*100).toExponential(1)} % ${c.eq<.01?'✓':'✗'}</td></tr><tr><td>Shaft power capacity at N</td><td>${f(v.tS*Math.PI*d**3/16*2*Math.PI*v.N/60/1e6/v.Ks,1)} kW ≥ ${v.P} kW ${v.tS*Math.PI*d**3/16*2*Math.PI*v.N/60/1e6/v.Ks>=v.P?'✓':'✗'}</td></tr></table><p class="sm">Equations: T=9550P/N; d=∛(16Td/πτ); bolts Td=n(π/4)d²τ(D₁/2); key τ=2T/(bld), σc=4T/(hld); hub τ=16TD/π(D⁴−d⁴); flange τ=2T/πD²t. Proportions after Bhandari (<i>Design of Machine Elements</i>), Khurmi &amp; Gupta (<i>Machine Design</i>), Shigley (<i>Mechanical Engineering Design</i>); IS 2693 / DIN 740 for coupling practice. Misalignment factor Kₘ=1+0.5(e/eₐ+α/αₐ) is a simplified educational model — verify against manufacturer data for critical drives.</p>`}
+go();
+</script></body></html>
